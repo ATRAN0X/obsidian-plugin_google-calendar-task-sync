@@ -1,0 +1,1 @@
+# obsidian-plugin_google-calendar-task-sync
