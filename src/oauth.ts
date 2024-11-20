@@ -149,17 +149,20 @@ export function closeOAuthServer(plugin: GoogleCalendarTaskSync): void {
 
 export function loadAndSetTokens(plugin: GoogleCalendarTaskSync): void {
   const { tokenData } = plugin.settings;
-  if (!tokenData) {
-    debugLog(plugin, 'No token data available.');
+  if (!tokenData || tokenData.trim() === "") {
+    debugLog(plugin, 'No valid token data available.');
     return;
   }
 
   try {
     const decryptedTokens = JSON.parse(decryptData(plugin, tokenData));
-    plugin.oAuth2Client?.setCredentials(decryptedTokens);
+    plugin.oAuth2Client = new google.auth.OAuth2(); // Initialize OAuth client
+    plugin.oAuth2Client.setCredentials(decryptedTokens);
     debugLog(plugin, 'Token data successfully loaded and set in OAuth2 client.');
   } catch (error) {
     console.error('Failed to load and set tokens:', error);
+    new Notice('Failed to load token data. Please authenticate again.');
+    plugin.oAuth2Client = null;
   }
 }
 
@@ -167,22 +170,30 @@ export function loadAndSetTokens(plugin: GoogleCalendarTaskSync): void {
 export async function refreshAccessToken(plugin: GoogleCalendarTaskSync): Promise<void> {
   const oAuth2Client = plugin.oAuth2Client;
   if (!oAuth2Client) {
-    debugLog(plugin, 'OAuth2 client not initialized.');
+    debugLog(plugin, 'OAuth2 client not initialized. Cannot refresh token.');
     return;
   }
 
   try {
-    const tokens = await oAuth2Client.getAccessToken();
-    if (tokens.res?.data) {
-      const updatedTokens = tokens.res.data;
-      plugin.settings.tokenData = encryptData(plugin, JSON.stringify(updatedTokens));
-      await saveSettings(plugin, plugin.settings);
+    const { credentials } = oAuth2Client;
+    const expirationBuffer = 60 * 5 * 1000; // 5 Minuten Pufferzeit
+    const now = new Date().getTime();
 
-      debugLog(plugin, 'Access token successfully refreshed and saved.');
-    } else {
-      debugLog(plugin, 'No new access token returned.');
+    if (credentials.expiry_date && credentials.expiry_date - now > expirationBuffer) {
+      debugLog(plugin, 'Access token is still valid. No refresh required.');
+      return;
     }
+
+    debugLog(plugin, 'Refreshing access token...');
+    const tokens = await oAuth2Client.refreshAccessToken();
+    const updatedTokens = tokens.credentials;
+    plugin.settings.tokenData = encryptData(plugin, JSON.stringify(updatedTokens));
+    await saveSettings(plugin, plugin.settings);
+
+    debugLog(plugin, 'Access token successfully refreshed and saved.');
+    new Notice('Access token refreshed successfully.');
   } catch (error) {
     console.error('Failed to refresh access token:', error);
+    new Notice('Failed to refresh access token. Please authenticate again.');
   }
 }

@@ -1,6 +1,6 @@
 import {Notice, Plugin} from 'obsidian';
 import { PluginSettings, DEFAULT_SETTINGS, loadSettings } from './settings';
-import { initializeOAuthClient } from './oauth';
+import {initializeOAuthClient, loadAndSetTokens, refreshAccessToken} from './oauth';
 import { addCommands } from './obsidianCommands';
 import * as path from 'path';
 import * as http from 'http';
@@ -26,34 +26,25 @@ export default class GoogleCalendarTaskSync extends Plugin {
 		return;
 		}
 
-	  // Plugin-Einstellungen laden
+	  // load plugin-settings
     this.settings = await loadSettings(this, DEFAULT_SETTINGS);
 
-    // Pfad für Token-Datei setzen
+    // set path to tokens
     const vaultPath = (this.app.vault.adapter as any).basePath;
     this.tokenFilePath = path.join(vaultPath, '.obsidian', 'plugins', this.manifest.id, 'data.json');
 
-	// Initialize the OAuth2 client using the stored token data
-	if (this.settings.tokenData) {
-		const { decryptData } = await import('./encryptionHandler');
-		try {
-		  // Decrypt and parse the token data
-		  let decryptedTokens = JSON.parse(decryptData(this, this.settings.tokenData));
+	// Token laden und setzen
+	loadAndSetTokens(this);
 
-		  this.oAuth2Client = new google.auth.OAuth2(); // Initialize OAuth client
-		  this.oAuth2Client.setCredentials(decryptedTokens); // Set the credentials from the decrypted tokens
-		  debugLog(this, `OAuth2 client initialized with existing tokens.`);
-		  new Notice('Google Calendar authenticated successfully.');
+	// Token aktualisieren, falls notwendig
+	await refreshAccessToken(this);
 
-		  decryptedTokens = null;
-
-		} catch (error) {
-		  console.error('Failed to initialize OAuth2 client with existing tokens:', error);
-		  new Notice('Failed to load existing authentication tokens. Please reauthenticate.');
-		}
-	} else {
-		// No token data available; ask the user to authenticate
+	// Check for valid OAuth client
+	if (!this.oAuth2Client) {
 		new Notice('No existing tokens found. Please authenticate with Google Calendar.');
+	} else {
+		debugLog(this, `OAuth2 client initialized and ready.`);
+		new Notice('Google Calendar authenticated successfully.');
 	}
 
     // Other initialization code
