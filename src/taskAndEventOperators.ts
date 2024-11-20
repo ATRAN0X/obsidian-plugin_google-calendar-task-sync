@@ -1,12 +1,12 @@
 import { calendar_v3, google } from "googleapis";
-import ExtendedGoogleCalendarSync from "./main";
+import GoogleCalendarTaskSync from "./main";
 import { mapYamlToEvent, saveTaskDataToYaml, logInfo } from "./fileHelpers";
 import { Notice, TFile } from "obsidian";
 import { getGoogleCalendarEvents } from "./dataFetchers";
 import {debugLog} from "./logger";
 
 
-export async function deleteEvent(plugin: ExtendedGoogleCalendarSync, eventId) {
+export async function deleteEvent(plugin: GoogleCalendarTaskSync, eventId) {
   const calendar = google.calendar({ version: 'v3', auth: plugin.oAuth2Client });
   try {
 	await calendar.events.delete({
@@ -19,7 +19,7 @@ export async function deleteEvent(plugin: ExtendedGoogleCalendarSync, eventId) {
   }
 }
 
-export async function createEventForTask(plugin: ExtendedGoogleCalendarSync, task: any) {
+export async function createEventForTask(plugin: GoogleCalendarTaskSync, task: any) {
 	const calendar = google.calendar({ version: 'v3', auth: plugin.oAuth2Client });
 	try {
 		const event = await mapYamlToEvent(plugin, task.data, task.file);
@@ -37,7 +37,7 @@ export async function createEventForTask(plugin: ExtendedGoogleCalendarSync, tas
 	}
 }
 
-export async function deleteAllGoogleEventsFromTasks(plugin: ExtendedGoogleCalendarSync): Promise<void> {
+export async function deleteAllGoogleEventsFromTasks(plugin: GoogleCalendarTaskSync): Promise<void> {
 	// Always process files to remove googleEventId regardless of Google Calendar events
 	logInfo('Processing vault files to remove Google Calendar event IDs...');
 	await processVaultFiles(plugin);
@@ -57,7 +57,7 @@ export async function deleteAllGoogleEventsFromTasks(plugin: ExtendedGoogleCalen
 
 
 
-export async function deleteEventAndRemoveField(plugin: ExtendedGoogleCalendarSync, event: calendar_v3.Schema$Event): Promise<void> {
+export async function deleteEventAndRemoveField(plugin: GoogleCalendarTaskSync, event: calendar_v3.Schema$Event): Promise<void> {
 	const auth = new google.auth.OAuth2(plugin.settings.clientId, plugin.settings.clientSecret);
 	auth.setCredentials(plugin.settings.tokenData);
 
@@ -76,7 +76,7 @@ export async function deleteEventAndRemoveField(plugin: ExtendedGoogleCalendarSy
 	await processVaultFiles(plugin, event.id!);
 }
 
-export async function processVaultFiles(plugin: ExtendedGoogleCalendarSync, googleEventId?: string): Promise<void> {
+export async function processVaultFiles(plugin: GoogleCalendarTaskSync, googleEventId?: string): Promise<void> {
 	const files = plugin.app.vault.getMarkdownFiles();
 
 	for (const file of files) {
@@ -88,7 +88,7 @@ export async function processVaultFiles(plugin: ExtendedGoogleCalendarSync, goog
 	}
 }
 
-export async function removeGoogleEventIdField(plugin: ExtendedGoogleCalendarSync, file: TFile, googleEventId?: string): Promise<void> {
+export async function removeGoogleEventIdField(plugin: GoogleCalendarTaskSync, file: TFile, googleEventId?: string): Promise<void> {
 	const content = await plugin.app.vault.read(file);
 	const lines = content.split('\n');
 	const yamlStartIndex = lines.indexOf('---');

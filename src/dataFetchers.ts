@@ -1,13 +1,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import ExtendedGoogleCalendarSync from "./main";
+import GoogleCalendarTaskSync from "./main";
 import { calendar_v3, google } from "googleapis";
 import {Notice} from "obsidian";
 import {findMatchingFolderPairs} from "./fileHelpers";
 import {debugLog} from "./logger";
 
 
-export async function fetchObsidianTasks(plugin: ExtendedGoogleCalendarSync, tag: string): Promise<any[]> {
+export async function fetchObsidianTasks(plugin: GoogleCalendarTaskSync, tag: string): Promise<any[]> {
     const tasks: any[] = [];
     const taskRootFolder = plugin.settings.taskFolderPath;
     const searchFolderName = plugin.settings.searchFolderName;
@@ -42,7 +42,7 @@ export async function fetchObsidianTasks(plugin: ExtendedGoogleCalendarSync, tag
 }
 
 // Retrieves events from the Google Calendar API
-export async function getGoogleCalendarEvents(plugin: ExtendedGoogleCalendarSync): Promise<calendar_v3.Schema$Event[]> {
+export async function getGoogleCalendarEvents(plugin: GoogleCalendarTaskSync): Promise<calendar_v3.Schema$Event[]> {
 	const auth = new google.auth.OAuth2(plugin.settings.clientId, plugin.settings.clientSecret);
 	auth.setCredentials(plugin.settings.tokenData);
 

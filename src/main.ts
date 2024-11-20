@@ -7,8 +7,9 @@ import * as http from 'http';
 import { OAuth2Client } from 'google-auth-library';
 import { GoogleCalendarSettingTab } from './obsidianSettingsTab';
 import {google} from "googleapis";
+import {debugLog} from "./logger";
 
-export default class ExtendedGoogleCalendarSync extends Plugin {
+export default class GoogleCalendarTaskSync extends Plugin {
   settings: PluginSettings;
   oAuth2Client: OAuth2Client | null = null;
   tokenFilePath: string;
@@ -41,7 +42,7 @@ export default class ExtendedGoogleCalendarSync extends Plugin {
 
 		  this.oAuth2Client = new google.auth.OAuth2(); // Initialize OAuth client
 		  this.oAuth2Client.setCredentials(decryptedTokens); // Set the credentials from the decrypted tokens
-		  console.log('OAuth2 client initialized with existing tokens.');
+		  debugLog(this, `OAuth2 client initialized with existing tokens.`);
 		  new Notice('Google Calendar authenticated successfully.');
 
 		  decryptedTokens = null;

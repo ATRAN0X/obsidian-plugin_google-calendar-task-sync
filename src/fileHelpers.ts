@@ -1,12 +1,12 @@
 import {Notice, TFile, TFolder, Vault} from "obsidian";
 import {calendar_v3} from "googleapis";
-import ExtendedGoogleCalendarSync from "./main";
+import GoogleCalendarTaskSync from "./main";
 import * as path from 'path';
 import * as fs from 'fs';
 import {debugLog} from "./logger";
 
 
-export async function mapYamlToEvent(plugin: ExtendedGoogleCalendarSync, taskData: any, file: TFile): Promise<calendar_v3.Schema$Event> {
+export async function mapYamlToEvent(plugin: GoogleCalendarTaskSync, taskData: any, file: TFile): Promise<calendar_v3.Schema$Event> {
 	const mappings = plugin.settings.fieldMappings;
 	const event: calendar_v3.Schema$Event = {};
 
@@ -83,7 +83,7 @@ export function logInfo(message: string): void {
 	console.log(`plugin:extended-google-calendar-sync: ${message}`);
 }
 
-export async function saveTaskDataToYaml(plugin: ExtendedGoogleCalendarSync, file: TFile, data: any) {
+export async function saveTaskDataToYaml(plugin: GoogleCalendarTaskSync, file: TFile, data: any) {
 	const yamlContent = `---\n${Object.entries(data)
 	  .map(([key, value]) => `${key}: ${value}`)
 	  .join('\n')}\n---\n`;
@@ -98,7 +98,7 @@ export async function saveTaskDataToYaml(plugin: ExtendedGoogleCalendarSync, fil
 }
 
 export async function moveTaskToFolder(
-  plugin: ExtendedGoogleCalendarSync,
+  plugin: GoogleCalendarTaskSync,
   file: TFile,
   targetFolderPath: string // already defined relative to the vault root
 ) {

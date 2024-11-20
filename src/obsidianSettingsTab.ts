@@ -2,14 +2,14 @@ import { App, Notice, PluginSettingTab, Setting } from "obsidian";
 import {DEFAULT_SETTINGS, PluginSettings, saveSettings} from "./settings";
 import { authenticateWithGoogle, initializeOAuthClient } from "./oauth";
 import { deleteAllGoogleEventsFromTasks } from "./taskAndEventOperators";
-import ExtendedGoogleCalendarSync from "./main";
+import GoogleCalendarTaskSync from "./main";
 import { decryptData, encryptData } from "./encryptionHandler";
 import {debugLog} from "./logger";
 
 export class GoogleCalendarSettingTab extends PluginSettingTab {
-  plugin: ExtendedGoogleCalendarSync;
+  plugin: GoogleCalendarTaskSync;
 
-  constructor(app: App, plugin: ExtendedGoogleCalendarSync) {
+  constructor(app: App, plugin: GoogleCalendarTaskSync) {
     super(app, plugin);
     this.plugin = plugin;
   }
@@ -50,7 +50,7 @@ export class GoogleCalendarSettingTab extends PluginSettingTab {
 
     // Save Credentials Button
     new Setting(containerEl)
-      .setName("Save and Authenticate")
+      .setName("Authenticate")
       .setDesc("Save credentials temporarily and authenticate with Google.")
       .addButton(button => {
         button.setButtonText("Authenticate")
@@ -63,23 +63,20 @@ export class GoogleCalendarSettingTab extends PluginSettingTab {
               }
 
               // Initialize OAuth client with the provided credentials
-              const oAuthClient = initializeOAuthClient(this.plugin, tempClientId, tempClientSecret);
-			  if (!oAuthClient) {
-
-				// Clear clientId and clientSecret after authentication
-				tempClientId = "";
-				tempClientSecret = "";
-
-				new Notice("Failed to initialize OAuth client. Check your credentials.");
-                return;
-              }
-
-              // Authenticate with Google
-              await authenticateWithGoogle(this.plugin);
+			  if (!this.plugin.oAuth2Client) {
+				  debugLog(this.plugin, `OAuth2 client not initialized. Attempting to initialize...`);
+				  initializeOAuthClient(this.plugin, tempClientId, tempClientSecret);
+				  if (!this.plugin.oAuth2Client) {
+					  console.error("OAuth2 client could not be initialized, canceling process.");
+					  return;
+				  }
+			  }
+			  await authenticateWithGoogle(this.plugin);
 
               // Clear clientId and clientSecret after authentication
               tempClientId = "";
               tempClientSecret = "";
+
               new Notice("Authentication successful. Tokens have been saved securely.");
             } catch (error) {
               console.error("Authentication error:", error);

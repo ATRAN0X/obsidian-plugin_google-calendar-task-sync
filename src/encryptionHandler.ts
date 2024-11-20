@@ -1,10 +1,10 @@
 import { AES, SHA256, enc } from "crypto-js";
 import os from "os";
 import { debugLog } from "./logger";
-import ExtendedGoogleCalendarSync from "./main";
+import GoogleCalendarTaskSync from "./main";
 
 // Generate a system-specific encryption key
-export function getSystemEncryptionKey(plugin: ExtendedGoogleCalendarSync): string {
+export function getSystemEncryptionKey(plugin: GoogleCalendarTaskSync): string {
   const userInfo = os.userInfo().username; // Get the system username
   const platform = os.platform(); // Get the platform type
   const keySource = `${userInfo}-${platform}`; // Combine user and platform info
@@ -18,7 +18,7 @@ export function getSystemEncryptionKey(plugin: ExtendedGoogleCalendarSync): stri
 }
 
 // Encrypt data using the system-specific encryption key
-export function encryptData(plugin: ExtendedGoogleCalendarSync, data: string): string {
+export function encryptData(plugin: GoogleCalendarTaskSync, data: string): string {
   try {
     const encryptionKey = getSystemEncryptionKey(plugin); // Retrieve the key
     const encryptedData = AES.encrypt(data, encryptionKey).toString(); // Encrypt the data
@@ -31,7 +31,7 @@ export function encryptData(plugin: ExtendedGoogleCalendarSync, data: string): s
 }
 
 // Decrypt data using the system-specific encryption key
-export function decryptData(plugin: ExtendedGoogleCalendarSync, encryptedData: string): string {
+export function decryptData(plugin: GoogleCalendarTaskSync, encryptedData: string): string {
   try {
     const encryptionKey = getSystemEncryptionKey(plugin);
     debugLog(plugin, `Attempting to decrypt data: ${encryptedData}`);

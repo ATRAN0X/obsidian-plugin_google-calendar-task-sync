@@ -1,4 +1,4 @@
-import ExtendedGoogleCalendarSync from "./main";
+import GoogleCalendarTaskSync from "./main";
 import { Notice, TFile } from "obsidian";
 import {
 	findMatchingFolderPairs,
@@ -16,7 +16,7 @@ import {debugLog, writeErrorLogs} from "./logger";
 
 
 export async function syncGoogleCalendarWithObsidian(
-  plugin: ExtendedGoogleCalendarSync,
+  plugin: GoogleCalendarTaskSync,
   tag: string = 'task',
   isQuickSync: boolean = false
 ) {
@@ -150,7 +150,7 @@ export async function syncGoogleCalendarWithObsidian(
 }
 
 
-export async function syncTaskToEvent(plugin: ExtendedGoogleCalendarSync, task: any, event: calendar_v3.Schema$Event) {
+export async function syncTaskToEvent(plugin: GoogleCalendarTaskSync, task: any, event: calendar_v3.Schema$Event) {
 	const calendar = google.calendar({ version: 'v3', auth: plugin.oAuth2Client });
 	try {
 		const updatedEvent = await mapYamlToEvent(plugin, task.data, task.file);

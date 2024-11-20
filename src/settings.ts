@@ -1,5 +1,5 @@
 import {Notice} from 'obsidian';
-import ExtendedGoogleCalendarSync from './main';
+import GoogleCalendarTaskSync from './main';
 import {decryptData} from "./encryptionHandler";
 import {debugLog} from "./logger";
 
@@ -46,7 +46,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 };
 
 // Load settings with decryption
-export async function loadSettings(plugin: ExtendedGoogleCalendarSync, defaults: PluginSettings): Promise<PluginSettings> {
+export async function loadSettings(plugin: GoogleCalendarTaskSync, defaults: PluginSettings): Promise<PluginSettings> {
     const data = await plugin.loadData();
 
     // Mische geladene Daten mit den Standardwerten
@@ -56,7 +56,7 @@ export async function loadSettings(plugin: ExtendedGoogleCalendarSync, defaults:
 }
 
 // Save settings with encryption
-export async function saveSettings(plugin: ExtendedGoogleCalendarSync, settings: PluginSettings): Promise<void> {
+export async function saveSettings(plugin: GoogleCalendarTaskSync, settings: PluginSettings): Promise<void> {
     try {
         await plugin.saveData(settings);
     } catch (error) {

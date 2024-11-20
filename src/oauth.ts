@@ -1,4 +1,4 @@
-import ExtendedGoogleCalendarSync from './main';
+import GoogleCalendarTaskSync from './main';
 import { OAuth2Client } from 'google-auth-library';
 import { google } from 'googleapis';
 import { saveSettings } from './settings';
@@ -6,108 +6,139 @@ import * as http from 'http';
 import { Notice } from 'obsidian';
 import { encryptData, decryptData } from './encryptionHandler';
 import { debugLog } from './logger';
+import * as readline from 'readline';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as open from 'open';
+
 
 let server: http.Server | undefined; // Holds the server instance
 
 /**
  * Initialize the OAuth2 client using decrypted credentials
  */
-export function initializeOAuthClient(plugin: ExtendedGoogleCalendarSync, tempClientId?: string, tempClientSecret?: string): OAuth2Client | null {
+export function initializeOAuthClient(plugin: GoogleCalendarTaskSync, tempClientId?: string, tempClientSecret?: string): void {
 	try {
+		// Case 1: Temporary Client ID and Secret are provided (during authentication)
 		if (tempClientId && tempClientSecret) {
-			return new google.auth.OAuth2(tempClientId, tempClientSecret, `http://localhost`);
+		  debugLog(plugin, `Initializing OAuth2 client with temp credentials.`);
+		  plugin.oAuth2Client = new google.auth.OAuth2(tempClientId, tempClientSecret, `http://localhost`);
+		  return; // Stop further processing
 		}
 
-		if (!plugin.settings.tokenData) {
-			let decryptedTokens: any;
+		// Case 2: Use token data from settings
+		if (plugin.settings.tokenData && plugin.settings.tokenData.trim() !== "") {
+		  try {
+			const decryptedTokens = JSON.parse(decryptData(plugin, plugin.settings.tokenData));
+			debugLog(plugin, `Decrypted tokens successfully.`);
 
-			try {
-				decryptedTokens = JSON.parse(decryptData(plugin, plugin.settings.tokenData));
-				const oAuth2Client = new google.auth.OAuth2(); // Initialize client without credentials
-				oAuth2Client.setCredentials(decryptedTokens);
-				return oAuth2Client;
-			} catch (error) {
-				console.error('Failed to initialize OAuth2 client:', error);
-				return null;
-			} finally {
-				decryptedTokens = null;
-			}
+			const oAuth2Client = new google.auth.OAuth2(); // Initialize client without explicit credentials
+			oAuth2Client.setCredentials(decryptedTokens);
+
+			plugin.oAuth2Client = oAuth2Client; // Store in plugin for later use
+			debugLog(plugin, `OAuth2 client successfully initialized with token data.`);
+		  } catch (error) {
+			console.error("Failed to decrypt or parse token data:", error);
+			new Notice("Invalid or corrupted token data. Please reauthenticate.");
+			plugin.oAuth2Client = null;
+		  }
+		  return; // Stop further processing
 		}
-    	console.error("No valid credentials or tokens provided.");
-    	return null;
 
-	} catch (error) {
-		console.error("Failed to initialize OAuth2 client:", error);
-		return null;
-	}
+		// Case 3: No credentials or token data available
+		console.error("No valid credentials or tokens provided.");
+		new Notice("No valid credentials or token data found. Please provide credentials or authenticate.");
+		plugin.oAuth2Client = null;
+	  } catch (error) {
+		console.error("Unexpected error while initializing OAuth2 client:", error);
+		new Notice("Unexpected error during OAuth2 initialization.");
+		plugin.oAuth2Client = null;
+	  }
 }
 
-/**
- * Start the Google authentication process
- */
-export async function authenticateWithGoogle(plugin: ExtendedGoogleCalendarSync): Promise<void> {
-  const oAuth2Client = plugin.oAuth2Client ?? initializeOAuthClient(plugin);
-  if (!oAuth2Client) return;
 
-  closeOAuthServer(plugin); // Close any previous server
+// Main function to authenticate with Google
+export async function authenticateWithGoogle(plugin: GoogleCalendarTaskSync, tempClientId?: string, tempClientSecret?: string): Promise<void> {
+  if (!plugin.oAuth2Client) {
+    new Notice("OAuth2 client could not be initialized. Please check your credentials or token data.");
+    return;
+  }
 
-  // Create a new server
-  server = http.createServer(async (req, res) => {
-    if (req.url?.startsWith('/?code=')) {
-      const code = new URL(req.url, `http://localhost`).searchParams.get('code');
-      res.end('Authentication successful! You can close this window.');
-      server?.close();
+  try {
+    const redirectUri = await startOAuthServer(plugin);
+    const authUrl = generateAuthUrl(plugin);
+    debugLog(plugin, `Generated Auth URL: ${authUrl}`);
+    window.open(authUrl, '_blank');
+    new Notice('Authentication started. Please check your browser to continue.');
+  } catch (error) {
+    console.error('Failed to start OAuth authentication process:', error);
+    new Notice('Failed to start OAuth authentication process.');
+  }
+}
 
-      if (code) {
-        try {
-          const { tokens } = await oAuth2Client.getToken({
-            code,
-            redirect_uri: plugin.redirectUri, // Dynamic redirect URI with the correct port
-          });
 
-		  oAuth2Client.setCredentials(tokens); // Set tokens in OAuth client
-          plugin.settings.tokenData = encryptData(plugin, JSON.stringify(tokens)); // Encrypt and save tokens
-          await saveSettings(plugin, plugin.settings);
-          new Notice('Google Calendar API authorized successfully and token saved.');
-
-        } catch (error) {
-          console.error('Error during token exchange:', error);
-          new Notice('Failed to authenticate with Google.');
-        }
+// Start the OAuth server
+export async function startOAuthServer(plugin: GoogleCalendarTaskSync): Promise<string> {
+  return new Promise((resolve, reject) => {
+    server = http.createServer((req, res) => handleOAuthCallback(req, res, plugin));
+    server.listen(0, () => {
+      const addressInfo = server?.address();
+      if (addressInfo && typeof addressInfo === 'object') {
+        const port = addressInfo.port;
+        const redirectUri = `http://localhost:${port}`;
+        plugin.redirectUri = redirectUri;
+        debugLog(plugin, `OAuth server listening on ${redirectUri}`);
+        resolve(redirectUri);
+      } else {
+        reject(new Error('Failed to start the OAuth server.'));
       }
-    }
-  });
-
-  // Dynamically assign a port and start the server
-  server.listen(0, () => {
-    const addressInfo = server?.address();
-    if (addressInfo && typeof addressInfo === 'object') {
-      const port = addressInfo.port;
-      const redirectUri = `http://localhost:${port}`; // Construct dynamic redirect URI
-      plugin.redirectUri = redirectUri; // Save redirect URI to plugin settings
-
-      debugLog(plugin, `OAuth server listening on ${redirectUri}`);
-
-      // Generate the Google Auth URL with the dynamic redirect URI
-      const authUrl = oAuth2Client.generateAuthUrl({
-        access_type: 'offline',
-        scope: ['https://www.googleapis.com/auth/calendar'],
-        redirect_uri: redirectUri, // Use the dynamic redirect URI
-      });
-
-      debugLog(plugin, `Generated Auth URL: ${authUrl}`);
-      window.open(authUrl, '_blank'); // Open the authentication URL in the browser
-      new Notice('Authentication started. Please check your browser to continue.');
-    } else {
-      new Notice('Failed to start the OAuth server.');
-    }
+    });
   });
 }
 
-/**
- * Close the OAuth server if it is running
- */
-export function closeOAuthServer(plugin: ExtendedGoogleCalendarSync): void {
+// Handle the OAuth callback
+function handleOAuthCallback(req: http.IncomingMessage, res: http.ServerResponse, plugin: GoogleCalendarTaskSync) {
+  if (req.url?.startsWith('/?code=')) {
+    const code = new URL(req.url, `http://localhost`).searchParams.get('code');
+    res.end('Authentication successful! You can close this window.');
+    server?.close();
+
+    if (code) {
+      exchangeCodeForTokens(plugin, code).catch((error) => {
+        console.error('Error during token exchange:', error);
+      });
+    }
+  }
+}
+
+// Exchange the code for tokens
+async function exchangeCodeForTokens(plugin: GoogleCalendarTaskSync, code: string): Promise<void> {
+  try {
+    const { tokens } = await plugin.oAuth2Client.getToken({
+      code,
+      redirect_uri: plugin.redirectUri,
+    });
+    plugin.oAuth2Client.setCredentials(tokens);
+    plugin.settings.tokenData = encryptData(plugin, JSON.stringify(tokens));
+    await saveSettings(plugin, plugin.settings);
+    new Notice('Google Calendar API authorized successfully and token saved.');
+  } catch (error) {
+    console.error('Error during token exchange:', error);
+    new Notice('Failed to authenticate with Google.');
+  }
+}
+
+// Generate the Google Auth URL
+function generateAuthUrl(plugin: GoogleCalendarTaskSync): string {
+  return plugin.oAuth2Client.generateAuthUrl({
+    access_type: 'offline',
+    scope: ['https://www.googleapis.com/auth/calendar'],
+    redirect_uri: plugin.redirectUri,
+  });
+}
+
+
+export function closeOAuthServer(plugin: GoogleCalendarTaskSync): void {
   if (server) {
     server.close();
     server = undefined;
@@ -115,7 +146,8 @@ export function closeOAuthServer(plugin: ExtendedGoogleCalendarSync): void {
   }
 }
 
-export function loadAndSetTokens(plugin: ExtendedGoogleCalendarSync): void {
+
+export function loadAndSetTokens(plugin: GoogleCalendarTaskSync): void {
   const { tokenData } = plugin.settings;
   if (!tokenData) {
     debugLog(plugin, 'No token data available.');
@@ -131,7 +163,8 @@ export function loadAndSetTokens(plugin: ExtendedGoogleCalendarSync): void {
   }
 }
 
-export async function refreshAccessToken(plugin: ExtendedGoogleCalendarSync): Promise<void> {
+
+export async function refreshAccessToken(plugin: GoogleCalendarTaskSync): Promise<void> {
   const oAuth2Client = plugin.oAuth2Client;
   if (!oAuth2Client) {
     debugLog(plugin, 'OAuth2 client not initialized.');

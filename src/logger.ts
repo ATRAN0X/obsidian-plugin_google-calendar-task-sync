@@ -1,7 +1,7 @@
-import ExtendedGoogleCalendarSync from './main';
+import GoogleCalendarTaskSync from './main';
 import fs from "fs";
 
-export function debugLog(plugin: ExtendedGoogleCalendarSync, message: string): void {
+export function debugLog(plugin: GoogleCalendarTaskSync, message: string): void {
   if (plugin.settings && plugin.settings.debugMode) {
     console.log(`[DEBUG]: ${message}`);
   }

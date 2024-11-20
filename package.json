@@ -25,6 +25,7 @@
 	"dependencies": {
 		"crypto-js": "^4.2.0",
 		"google-auth-library": "^9.14.2",
-		"googleapis": "^144.0.0"
+		"googleapis": "^144.0.0",
+		"open": "^10.1.0"
 	}
 }
