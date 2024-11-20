@@ -12,26 +12,34 @@ let server: http.Server | undefined; // Holds the server instance
 /**
  * Initialize the OAuth2 client using decrypted credentials
  */
-export function initializeOAuthClient(plugin: ExtendedGoogleCalendarSync): OAuth2Client | null {
-  const { clientId, clientSecret } = plugin.settings;
+export function initializeOAuthClient(plugin: ExtendedGoogleCalendarSync, tempClientId?: string, tempClientSecret?: string): OAuth2Client | null {
+	try {
+		if (tempClientId && tempClientSecret) {
+			return new google.auth.OAuth2(tempClientId, tempClientSecret, `http://localhost`);
+		}
 
-  if (!clientId || !clientSecret) {
-    debugLog(plugin, 'Cannot initialize OAuth2 client: Missing Client ID or Client Secret.');
-    return null;
-  }
+		if (!plugin.settings.tokenData) {
+			let decryptedTokens: any;
 
-  try {
-    const decryptedClientId = decryptData(plugin, clientId);
-    const decryptedClientSecret = decryptData(plugin, clientSecret);
+			try {
+				decryptedTokens = JSON.parse(decryptData(plugin, plugin.settings.tokenData));
+				const oAuth2Client = new google.auth.OAuth2(); // Initialize client without credentials
+				oAuth2Client.setCredentials(decryptedTokens);
+				return oAuth2Client;
+			} catch (error) {
+				console.error('Failed to initialize OAuth2 client:', error);
+				return null;
+			} finally {
+				decryptedTokens = null;
+			}
+		}
+    	console.error("No valid credentials or tokens provided.");
+    	return null;
 
-    // Note: Redirect URI is dynamically generated
-    plugin.oAuth2Client = new google.auth.OAuth2(decryptedClientId, decryptedClientSecret, `http://localhost`);
-    debugLog(plugin, 'OAuth2 client initialized successfully.');
-    return plugin.oAuth2Client;
-  } catch (error) {
-    console.error('Failed to initialize OAuth2 client:', error);
-    return null;
-  }
+	} catch (error) {
+		console.error("Failed to initialize OAuth2 client:", error);
+		return null;
+	}
 }
 
 /**
@@ -56,10 +64,12 @@ export async function authenticateWithGoogle(plugin: ExtendedGoogleCalendarSync)
             code,
             redirect_uri: plugin.redirectUri, // Dynamic redirect URI with the correct port
           });
-          oAuth2Client.setCredentials(tokens); // Set tokens in OAuth client
+
+		  oAuth2Client.setCredentials(tokens); // Set tokens in OAuth client
           plugin.settings.tokenData = encryptData(plugin, JSON.stringify(tokens)); // Encrypt and save tokens
           await saveSettings(plugin, plugin.settings);
           new Notice('Google Calendar API authorized successfully and token saved.');
+
         } catch (error) {
           console.error('Error during token exchange:', error);
           new Notice('Failed to authenticate with Google.');
@@ -102,5 +112,44 @@ export function closeOAuthServer(plugin: ExtendedGoogleCalendarSync): void {
     server.close();
     server = undefined;
     debugLog(plugin, 'OAuth server closed.');
+  }
+}
+
+export function loadAndSetTokens(plugin: ExtendedGoogleCalendarSync): void {
+  const { tokenData } = plugin.settings;
+  if (!tokenData) {
+    debugLog(plugin, 'No token data available.');
+    return;
+  }
+
+  try {
+    const decryptedTokens = JSON.parse(decryptData(plugin, tokenData));
+    plugin.oAuth2Client?.setCredentials(decryptedTokens);
+    debugLog(plugin, 'Token data successfully loaded and set in OAuth2 client.');
+  } catch (error) {
+    console.error('Failed to load and set tokens:', error);
+  }
+}
+
+export async function refreshAccessToken(plugin: ExtendedGoogleCalendarSync): Promise<void> {
+  const oAuth2Client = plugin.oAuth2Client;
+  if (!oAuth2Client) {
+    debugLog(plugin, 'OAuth2 client not initialized.');
+    return;
+  }
+
+  try {
+    const tokens = await oAuth2Client.getAccessToken();
+    if (tokens.res?.data) {
+      const updatedTokens = tokens.res.data;
+      plugin.settings.tokenData = encryptData(plugin, JSON.stringify(updatedTokens));
+      await saveSettings(plugin, plugin.settings);
+
+      debugLog(plugin, 'Access token successfully refreshed and saved.');
+    } else {
+      debugLog(plugin, 'No new access token returned.');
+    }
+  } catch (error) {
+    console.error('Failed to refresh access token:', error);
   }
 }

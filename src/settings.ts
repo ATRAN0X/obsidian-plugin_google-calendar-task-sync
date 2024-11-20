@@ -4,8 +4,6 @@ import {decryptData} from "./encryptionHandler";
 import {debugLog} from "./logger";
 
 export interface PluginSettings {
-  clientId: string;
-  clientSecret: string;
   tokenData?: any;
   fieldMappings: {
     start: string;
@@ -26,8 +24,6 @@ export interface PluginSettings {
 }
 
 export const DEFAULT_SETTINGS: PluginSettings = {
-	clientId: '',
-	clientSecret: '',
 	fieldMappings: {
 		start: 'due',
 		end: 'due',

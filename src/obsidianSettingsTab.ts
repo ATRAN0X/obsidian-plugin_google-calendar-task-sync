@@ -4,6 +4,7 @@ import { authenticateWithGoogle, initializeOAuthClient } from "./oauth";
 import { deleteAllGoogleEventsFromTasks } from "./taskAndEventOperators";
 import ExtendedGoogleCalendarSync from "./main";
 import { decryptData, encryptData } from "./encryptionHandler";
+import {debugLog} from "./logger";
 
 export class GoogleCalendarSettingTab extends PluginSettingTab {
   plugin: ExtendedGoogleCalendarSync;
@@ -19,78 +20,72 @@ export class GoogleCalendarSettingTab extends PluginSettingTab {
     containerEl.empty();
     containerEl.createEl('h2', { text: 'Settings for Google Calendar Sync' });
 
+    // Temporary storage for clientId and clientSecret
+    let tempClientId: string = "";
+    let tempClientSecret: string = "";
+
     // Setting for Client ID
     new Setting(containerEl)
-      .setName('Client ID')
-      .setDesc('Set your Google API client ID.')
+      .setName("Client ID")
+      .setDesc("Set your Google API client ID (used only for authentication).")
       .addText(text =>
         text
-          .setPlaceholder('Enter Client ID')
-          .setValue(this.plugin.settings.clientId || '')
-          .onChange(async (value) => {
-            this.plugin.settings.clientId = encryptData(this.plugin, value);
+          .setPlaceholder("Enter Client ID")
+          .onChange(value => {
+            tempClientId = value.trim();
           })
       );
 
     // Setting for Client Secret
     new Setting(containerEl)
-      .setName('Client Secret')
-      .setDesc('Set your Google API client secret.')
+      .setName("Client Secret")
+      .setDesc("Set your Google API client secret (used only for authentication).")
       .addText(text =>
         text
-          .setPlaceholder('Enter Client Secret')
-          .setValue(this.plugin.settings.clientSecret || '')
-          .onChange(async (value) => {
-            this.plugin.settings.clientSecret = encryptData(this.plugin, value);
+          .setPlaceholder("Enter Client Secret")
+          .onChange(value => {
+            tempClientSecret = value.trim();
           })
       );
 
-	// Save Credentials Button
-	new Setting(containerEl)
-	  .setName("Save Credentials")
-	  .setDesc("Click to encrypt and save Client ID and Client Secret.")
-	  .addButton(button => {
-		button.setButtonText("Save")
-		  .setCta()
-		  .onClick(async () => {
-			try {
-			  const { clientId, clientSecret } = this.plugin.settings;
-			  if (!clientId || !clientSecret) {
-				new Notice("Both Client ID and Client Secret must be set before saving.");
-				return;
-			  }
-
-			  // Save sensitive fields
-			  await saveSettings(this.plugin, this.plugin.settings);
-			  new Notice("Client ID and Client Secret saved successfully.");
-
-			  // Reload the plugin
-			  await this.plugin.unload();
-			  await this.plugin.onload();
-
-			  // Automatically re-open the settings tab
-			  const pluginId = this.plugin.manifest.id;
-			  this.app.setting.open();
-			  const pluginTab = this.app.setting.activeTab;
-			  if (pluginTab && pluginTab.id === pluginId) {
-				  this.app.setting.openTabById(pluginId);
-			  }
-
-			} catch (error) {
-			  console.error("Failed to save credentials:", error);
-			  new Notice("Failed to save credentials. Check the console for details.");
-			}
-		  });
-	  });
-
-
-    // Authenticate with Google Button
+    // Save Credentials Button
     new Setting(containerEl)
-      .setName('Authenticate with Google')
-      .setDesc('Click the button to authenticate with Google and allow access to your Google Calendar.')
+      .setName("Save and Authenticate")
+      .setDesc("Save credentials temporarily and authenticate with Google.")
       .addButton(button => {
-        button.setButtonText('Authenticate');
-        button.onClick(() => authenticateWithGoogle(this.plugin));
+        button.setButtonText("Authenticate")
+          .setCta()
+          .onClick(async () => {
+            try {
+              if (!tempClientId || !tempClientSecret) {
+                new Notice("Both Client ID and Client Secret must be set before proceeding.");
+                return;
+              }
+
+              // Initialize OAuth client with the provided credentials
+              const oAuthClient = initializeOAuthClient(this.plugin, tempClientId, tempClientSecret);
+			  if (!oAuthClient) {
+
+				// Clear clientId and clientSecret after authentication
+				tempClientId = "";
+				tempClientSecret = "";
+
+				new Notice("Failed to initialize OAuth client. Check your credentials.");
+                return;
+              }
+
+              // Authenticate with Google
+              await authenticateWithGoogle(this.plugin);
+
+              // Clear clientId and clientSecret after authentication
+              tempClientId = "";
+              tempClientSecret = "";
+              new Notice("Authentication successful. Tokens have been saved securely.");
+            } catch (error) {
+              console.error("Authentication error:", error);
+              new Notice("Authentication failed. Check the console for more details.");
+            }
+          });
       });
 
     const fieldMappingsSetting = containerEl.createEl('details', { cls: 'collapsible' });
