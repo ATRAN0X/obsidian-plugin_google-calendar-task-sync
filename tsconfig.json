@@ -1,24 +1,25 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
-    "inlineSourceMap": true,
-    "inlineSources": true,
-    "module": "ESNext",
-    "target": "ES6",
-    "allowJs": true,
-    "noImplicitAny": true,
-    "moduleResolution": "node",
-    "importHelpers": true,
-    "isolatedModules": true,
-    "strictNullChecks": true,
-    "lib": [
-      "DOM",
-      "ES5",
-      "ES6",
-      "ES7"
-    ]
+    "baseUrl": ".", // Base directory for resolving non-relative module imports
+    "inlineSourceMap": true, // Embed source maps in the output for debugging
+    "inlineSources": true, // Include the source code in the source maps
+    "module": "ESNext", // Use the latest module system (e.g., for dynamic imports)
+    "target": "ES6", // Compile to ECMAScript 6 (2015) or later
+    "allowJs": true, // Allow the use of JavaScript files in the project
+    "noImplicitAny": true, // Prevent variables from being implicitly typed as `any`
+    "moduleResolution": "node", // Use Node.js module resolution strategy
+    "importHelpers": true, // Reduce duplicated code when using `tslib` helpers
+    "isolatedModules": true, // Enforce strict module boundaries (useful with bundlers)
+    "strictNullChecks": true, // Strictly check for `null` and `undefined` values
+    "forceConsistentCasingInFileNames": true, // Ensure consistent file name casing
+    "skipLibCheck": true, // Skip type checking of declaration files in `node_modules`
+    "esModuleInterop": true, // Allow CommonJS modules to be imported with `import` syntax
+    "resolveJsonModule": true, // Enable importing JSON files as modules
+    "lib": ["DOM", "ES6"], // Include DOM and ES6 libraries for browser and modern JavaScript APIs
+    "outDir": "./dist", // Directory where compiled files will be stored
+    "rootDir": "./src", // Root directory of source files
+    "strict": true // Enable all strict type checking options
   },
-  "include": [
-    "**/*.ts"
-  ]
+  "include": ["src/**/*.ts"], // Include all TypeScript files in the `src` directory
+  "exclude": ["node_modules", "dist"] // Exclude `node_modules` and `dist` from compilation
 }
