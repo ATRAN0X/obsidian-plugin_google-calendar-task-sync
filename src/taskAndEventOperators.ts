@@ -5,6 +5,7 @@ import { Notice, TFile } from "obsidian";
 import { getGoogleCalendarEvents } from "./dataFetchers";
 import {debugLog} from "./logger";
 import {decryptData} from "./encryptionHandler";
+import {refreshAccessToken} from "./oauth";
 
 
 export async function deleteEvent(plugin: GoogleCalendarTaskSync, eventId) {
@@ -39,80 +40,98 @@ export async function createEventForTask(plugin: GoogleCalendarTaskSync, task: a
 }
 
 export async function deleteAllGoogleEventsFromTasks(plugin: GoogleCalendarTaskSync): Promise<void> {
-	// Always process files to remove googleEventId regardless of Google Calendar events
-	logInfo('Processing vault files to remove Google Calendar event IDs...');
-	await processVaultFiles(plugin);
+  debugLog(plugin, "Starting deletion of all Google Calendar events...");
 
-	const eventsToDelete = await getGoogleCalendarEvents(plugin);
-	const totalEvents = eventsToDelete.length;
-	const progressNotice = new Notice(`Deleting 0 of ${totalEvents} events...`, 0);
+  // Refresh the access token to ensure it's valid
+  await refreshAccessToken(plugin);
 
-	for (let i = 0; i < totalEvents; i++) {
-	  await deleteEventAndRemoveField(plugin, eventsToDelete[i]);
-	  progressNotice.setMessage(`Deleting ${i + 1} of ${totalEvents} events...`);
-	}
+  // Fetch all Google Calendar events
+  const eventsToDelete = await getGoogleCalendarEvents(plugin);
+  const totalEvents = eventsToDelete.length;
 
-	progressNotice.setMessage(`Successfully deleted ${totalEvents} events.`);
-	setTimeout(() => progressNotice.hide(), 3000);
-	}
+  if (totalEvents === 0) {
+    new Notice("No events found in Google Calendar to delete.");
+    return;
+  }
 
+  // Progress notification
+  const progressNotice = new Notice(`Deleting 0 of ${totalEvents} events...`, 0);
+
+  for (let i = 0; i < totalEvents; i++) {
+    try {
+      // Delete the event and update corresponding files
+      await deleteEventAndRemoveField(plugin, eventsToDelete[i]);
+      progressNotice.setMessage(`Deleting ${i + 1} of ${totalEvents} events...`);
+    } catch (error) {
+      console.error(`Failed to delete event ${eventsToDelete[i].id}:`, error);
+    }
+  }
+
+  progressNotice.setMessage(`Successfully deleted ${totalEvents} events.`);
+  setTimeout(() => progressNotice.hide(), 3000);
+
+  debugLog(plugin, `Successfully deleted ${totalEvents} Google Calendar events.`);
+}
 
 
 export async function deleteEventAndRemoveField(plugin: GoogleCalendarTaskSync, event: calendar_v3.Schema$Event): Promise<void> {
-	const auth = new google.auth.OAuth2(decryptData(plugin, plugin.settings.encClientId), decryptData(plugin, plugin.settings.encClientSecret));
-	auth.setCredentials(plugin.settings.encTokenData);
+  if (!event.id) {
+    debugLog(plugin, "Event ID is missing. Skipping deletion.");
+    return;
+  }
 
-	const calendar = google.calendar({ version: 'v3', auth });
+  const calendar = google.calendar({ version: "v3", auth: plugin.oAuth2Client });
 
-	// Delete the event from Google Calendar
-	await calendar.events.delete({
-	  calendarId: 'primary',
-	  eventId: event.id!,
-	});
+  try {
+    // Delete the event from Google Calendar
+    await calendar.events.delete({
+      calendarId: "primary",
+      eventId: event.id,
+    });
 
-	// Log information about the deleted event
-	logInfo(`Deleted Google Calendar event: ${event.id}`);
+    debugLog(plugin, `Deleted Google Calendar event: ${event.id}`);
 
-	// Process vault files and remove googleEventId field if found
-	await processVaultFiles(plugin, event.id!);
+    // Remove the `googleEventId` field from corresponding Obsidian files
+    await processVaultFilesForDeletion(plugin, event.id);
+  } catch (error) {
+    throw new Error(`Failed to delete event with ID ${event.id}: ${error.message}`);
+  }
 }
 
-export async function processVaultFiles(plugin: GoogleCalendarTaskSync, googleEventId?: string): Promise<void> {
-	const files = plugin.app.vault.getMarkdownFiles();
 
-	for (const file of files) {
-	  if (googleEventId) {
-		await removeGoogleEventIdField(plugin, file, googleEventId);
-	  } else {
-		await removeGoogleEventIdField(plugin, file);
-	  }
-	}
+export async function processVaultFilesForDeletion(plugin: GoogleCalendarTaskSync, googleEventId?: string): Promise<void> {
+  const files = plugin.app.vault.getMarkdownFiles();
+
+  for (const file of files) {
+    await removeGoogleEventIdField(plugin, file, googleEventId);
+  }
 }
+
 
 export async function removeGoogleEventIdField(plugin: GoogleCalendarTaskSync, file: TFile, googleEventId?: string): Promise<void> {
-	const content = await plugin.app.vault.read(file);
-	const lines = content.split('\n');
-	const yamlStartIndex = lines.indexOf('---');
-	const yamlEndIndex = lines.indexOf('---', yamlStartIndex + 1);
+  const content = await plugin.app.vault.read(file);
+  const lines = content.split("\n");
+  const yamlStartIndex = lines.indexOf("---");
+  const yamlEndIndex = lines.indexOf("---", yamlStartIndex + 1);
 
-	if (yamlStartIndex !== -1 && yamlEndIndex !== -1) {
-	  const yamlContent = lines.slice(yamlStartIndex + 1, yamlEndIndex);
-	  const updatedYamlContent = yamlContent.filter(line => {
-		if (googleEventId && line.includes(`googleEventId: ${googleEventId}`)) {
-		  return false;
-		}
-		return !line.trim().startsWith('googleEventId:');
-	  });
+  if (yamlStartIndex !== -1 && yamlEndIndex !== -1) {
+    const yamlContent = lines.slice(yamlStartIndex + 1, yamlEndIndex);
+    const updatedYamlContent = yamlContent.filter(line => {
+      if (googleEventId && line.includes(`googleEventId: ${googleEventId}`)) {
+        return false; // Remove specific googleEventId
+      }
+      return !line.trim().startsWith("googleEventId:");
+    });
 
-	  if (yamlContent.length !== updatedYamlContent.length) {
-		const updatedContent = [
-		  ...lines.slice(0, yamlStartIndex + 1),
-		  ...updatedYamlContent,
-		  ...lines.slice(yamlEndIndex),
-		].join('\n');
+    if (yamlContent.length !== updatedYamlContent.length) {
+      const updatedContent = [
+        ...lines.slice(0, yamlStartIndex + 1),
+        ...updatedYamlContent,
+        ...lines.slice(yamlEndIndex),
+      ].join("\n");
 
-		await plugin.app.vault.modify(file, updatedContent);
-		logInfo(`Updated file: ${file.path} - Removed googleEventId`);
-	  }
-	}
+      await plugin.app.vault.modify(file, updatedContent);
+      debugLog(plugin, `Updated file: ${file.path} - Removed googleEventId`);
+    }
+  }
 }
