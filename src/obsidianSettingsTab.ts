@@ -50,8 +50,8 @@ export class GoogleCalendarSettingTab extends PluginSettingTab {
 
     // Save Credentials Button
     new Setting(containerEl)
-      .setName("Authenticate")
-      .setDesc("Save credentials temporarily and authenticate with Google.")
+      .setName("Save and Authenticate")
+      .setDesc("Encrypt + save credentials and authenticate with Google.")
       .addButton(button => {
         button.setButtonText("Authenticate")
           .setCta()
@@ -62,20 +62,28 @@ export class GoogleCalendarSettingTab extends PluginSettingTab {
                 return;
               }
 
-              // Initialize OAuth client with the provided credentials
+			  this.plugin.settings.encTokenData = null;
+			  debugLog(this.plugin, "Existing tokenData cleared.");
+
+              this.plugin.settings.encClientId = encryptData(this.plugin, tempClientId);
+			  this.plugin.settings.encClientSecret = encryptData(this.plugin, tempClientSecret);
+			  await saveSettings(this.plugin, this.plugin.settings);
+			  debugLog(this.plugin, "ClientId and ClientSecret successfully encrypted and saved.");
+
+			  // Clear clientId and clientSecret after authentication
+              tempClientId = "";
+              tempClientSecret = "";
+
+			  // Initialize OAuth client with the provided credentials
 			  if (!this.plugin.oAuth2Client) {
 				  debugLog(this.plugin, `OAuth2 client not initialized. Attempting to initialize...`);
-				  initializeOAuthClient(this.plugin, tempClientId, tempClientSecret);
+				  initializeOAuthClient(this.plugin, decryptData(this.plugin, this.plugin.settings.encClientId), decryptData(this.plugin, this.plugin.settings.encClientSecret));
 				  if (!this.plugin.oAuth2Client) {
 					  console.error("OAuth2 client could not be initialized, canceling process.");
 					  return;
 				  }
 			  }
-			  await authenticateWithGoogle(this.plugin);
-
-              // Clear clientId and clientSecret after authentication
-              tempClientId = "";
-              tempClientSecret = "";
+			  await authenticateWithGoogle(this.plugin, decryptData(this.plugin, this.plugin.settings.encClientId), decryptData(this.plugin, this.plugin.settings.encClientSecret));
 
               new Notice("Authentication successful. Tokens have been saved securely.");
             } catch (error) {

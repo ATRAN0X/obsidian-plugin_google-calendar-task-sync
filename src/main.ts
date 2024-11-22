@@ -1,6 +1,6 @@
 import {Notice, Plugin} from 'obsidian';
 import { PluginSettings, DEFAULT_SETTINGS, loadSettings } from './settings';
-import {initializeOAuthClient, loadAndSetTokens, refreshAccessToken} from './oauth';
+import {checkAndInitialize, refreshAccessToken} from './oauth';
 import { addCommands } from './obsidianCommands';
 import * as path from 'path';
 import * as http from 'http';
@@ -34,7 +34,7 @@ export default class GoogleCalendarTaskSync extends Plugin {
     this.tokenFilePath = path.join(vaultPath, '.obsidian', 'plugins', this.manifest.id, 'data.json');
 
 	// Token laden und setzen
-	loadAndSetTokens(this);
+	await checkAndInitialize(this);
 
 	// Token aktualisieren, falls notwendig
 	await refreshAccessToken(this);

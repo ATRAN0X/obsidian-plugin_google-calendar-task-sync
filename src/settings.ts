@@ -4,7 +4,9 @@ import {decryptData} from "./encryptionHandler";
 import {debugLog} from "./logger";
 
 export interface PluginSettings {
-  tokenData?: any;
+  encClientId?: string;
+  encClientSecret?: string;
+  encTokenData?: any;
   fieldMappings: {
     start: string;
     end: string;

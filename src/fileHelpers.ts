@@ -123,6 +123,7 @@ export async function moveTaskToFolder(
 
 // Function to identify folder pairs within the task root folder
 export function findMatchingFolderPairs(
+  plugin: GoogleCalendarTaskSync,
   vault: Vault,
   rootFolderPath: string,
   searchFolderName: string,

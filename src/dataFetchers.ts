@@ -14,7 +14,7 @@ export async function fetchObsidianTasks(plugin: GoogleCalendarTaskSync, tag: st
     const doneFolderName = plugin.settings.doneFolderName;
 
     // Find all pairs of `searchFolderName` and `doneFolderName` folders within the `taskRootFolder`
-    const folderPairs = findMatchingFolderPairs(plugin.app.vault, taskRootFolder, searchFolderName, doneFolderName);
+    const folderPairs = findMatchingFolderPairs(plugin, plugin.app.vault, taskRootFolder, searchFolderName, doneFolderName);
 
     // Retrieve all markdown files in the vault
     const markdownFiles = plugin.app.vault.getMarkdownFiles();
@@ -43,15 +43,30 @@ export async function fetchObsidianTasks(plugin: GoogleCalendarTaskSync, tag: st
 
 // Retrieves events from the Google Calendar API
 export async function getGoogleCalendarEvents(plugin: GoogleCalendarTaskSync): Promise<calendar_v3.Schema$Event[]> {
-	const auth = new google.auth.OAuth2(plugin.settings.clientId, plugin.settings.clientSecret);
-	auth.setCredentials(plugin.settings.tokenData);
+  // Ensure the OAuth2 client is initialized and has valid credentials
+  if (!plugin.oAuth2Client) {
+    throw new Error("OAuth2 client is not initialized. Please authenticate with Google.");
+  }
 
-	const calendar = google.calendar({ version: 'v3', auth });
+  try {
+    // Refresh access token if necessary
+    const tokens = await plugin.oAuth2Client.getAccessToken();
+    if (tokens.token) {
+      plugin.oAuth2Client.setCredentials({ access_token: tokens.token });
+    }
 
-	const response = await calendar.events.list({
-		calendarId: 'primary',
-		maxResults: 2500,
-	});
+    // Access the Google Calendar API
+    const calendar = google.calendar({ version: "v3", auth: plugin.oAuth2Client });
 
-	return response.data.items || [];
+    // Retrieve the calendar events
+    const response = await calendar.events.list({
+      calendarId: "primary",
+      maxResults: 2500,
+    });
+
+    return response.data.items || [];
+  } catch (error) {
+    console.error("Failed to retrieve Google Calendar events:", error);
+    throw new Error("Error fetching Google Calendar events. Please check the console for details.");
+  }
 }

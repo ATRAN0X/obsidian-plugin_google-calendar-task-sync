@@ -4,6 +4,7 @@ import { mapYamlToEvent, saveTaskDataToYaml, logInfo } from "./fileHelpers";
 import { Notice, TFile } from "obsidian";
 import { getGoogleCalendarEvents } from "./dataFetchers";
 import {debugLog} from "./logger";
+import {decryptData} from "./encryptionHandler";
 
 
 export async function deleteEvent(plugin: GoogleCalendarTaskSync, eventId) {
@@ -58,8 +59,8 @@ export async function deleteAllGoogleEventsFromTasks(plugin: GoogleCalendarTaskS
 
 
 export async function deleteEventAndRemoveField(plugin: GoogleCalendarTaskSync, event: calendar_v3.Schema$Event): Promise<void> {
-	const auth = new google.auth.OAuth2(plugin.settings.clientId, plugin.settings.clientSecret);
-	auth.setCredentials(plugin.settings.tokenData);
+	const auth = new google.auth.OAuth2(decryptData(plugin, plugin.settings.encClientId), decryptData(plugin, plugin.settings.encClientSecret));
+	auth.setCredentials(plugin.settings.encTokenData);
 
 	const calendar = google.calendar({ version: 'v3', auth });
 

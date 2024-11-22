@@ -31,7 +31,7 @@ export function encryptData(plugin: GoogleCalendarTaskSync, data: string): strin
 }
 
 // Decrypt data using the system-specific encryption key
-export function decryptData(plugin: GoogleCalendarTaskSync, encryptedData: string): string {
+export function decryptData(plugin: GoogleCalendarTaskSync, encryptedData: string | undefined): string {
   try {
     const encryptionKey = getSystemEncryptionKey(plugin);
     debugLog(plugin, `Attempting to decrypt data: ${encryptedData}`);
