@@ -34,6 +34,16 @@ export async function syncGoogleCalendarWithObsidian(
 		return;
 	}
 
+	if (!plugin.settings.encTokenData) {
+		new Notice("Please authenticate with Google Calendar first.");
+		return;
+	}
+
+	// Check if the 'status' field is set in the plugin settings
+    if (!plugin.settings.fieldMappings.status || plugin.settings.fieldMappings.status.trim() === "") {
+        throw new Error("The 'status' field in the settings is not defined. Please set it in the plugin settings.");
+    }
+
 	// Refresh access token if necessary
 	await refreshAccessToken(plugin);
 
@@ -66,11 +76,6 @@ export async function syncGoogleCalendarWithObsidian(
 		new Notice("No tasks found to sync.");
 		return;
 	}
-
-	if (!plugin.settings.encTokenData) {
-		new Notice("Please authenticate with Google first.");
-		return;
-  	}
 
 	const calendar = google.calendar({ version: "v3", auth: plugin.oAuth2Client });
 	let processedCount = 0;
@@ -117,7 +122,9 @@ export async function syncGoogleCalendarWithObsidian(
 			}
 
 			// Check if task status indicates it should be deleted
-			if (task.data[plugin.settings.fieldMappings.status] === plugin.settings.deleteStatus) {
+			debugLog(plugin, `Task status: ${task.data[plugin.settings.fieldMappings.status]}, Delete status: ${plugin.settings.deleteStatus}`);
+			if (task.data[plugin.settings.fieldMappings.status]?.trim() === plugin.settings.deleteStatus.trim()) {
+
 				// Delete event and move task to the corresponding `doneFolder`
 				if (task.data.googleEventId) {
 					await deleteEvent(plugin, task.data.googleEventId);

@@ -13,7 +13,7 @@ export interface PluginSettings {
     name: string;
     description?: string;
     location?: string;
-    status?: string;
+    status: string;
     [key: string]: string | undefined;
   };
   deleteStatus: string;
@@ -32,7 +32,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
 		name: 'name',
 		description: '',
 		location: '',
-		status: '',
+		status: 'status',
 		attendees: '',
 		colorId: '',
 		reminders: '',

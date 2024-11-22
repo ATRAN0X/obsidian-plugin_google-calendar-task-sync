@@ -1,0 +1,1 @@
+{"root":["./src/calendarsync.ts","./src/datafetchers.ts","./src/encryptionhandler.ts","./src/filehelpers.ts","./src/logger.ts","./src/main.ts","./src/oauth.ts","./src/obsidiancommands.ts","./src/obsidiansettingstab.ts","./src/settings.ts","./src/taskandeventoperators.ts"],"errors":true,"version":"5.6.3"}
