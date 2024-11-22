@@ -83,7 +83,7 @@ export async function deleteEventAndRemoveField(plugin: GoogleCalendarTaskSync, 
   const calendar = google.calendar({ version: "v3", auth: plugin.oAuth2Client });
 
   try {
-    // Delete the event from Google Calendar
+    // Step 1: Delete the event from Google Calendar
     await calendar.events.delete({
       calendarId: "primary",
       eventId: event.id,
@@ -91,12 +91,16 @@ export async function deleteEventAndRemoveField(plugin: GoogleCalendarTaskSync, 
 
     debugLog(plugin, `Deleted Google Calendar event: ${event.id}`);
 
-    // Remove the `googleEventId` field from corresponding Obsidian files
+    // Step 2: Remove the `googleEventId` field from corresponding Obsidian files
     await processVaultFilesForDeletion(plugin, event.id);
+
   } catch (error) {
-    throw new Error(`Failed to delete event with ID ${event.id}: ${error.message}`);
+    // Log the error and ensure no YAML modifications occur
+    console.error(`Failed to delete event with ID ${event.id}:`, error);
+    new Notice(`Failed to delete event with ID ${event.id}. Check console for details.`);
   }
 }
+
 
 
 export async function processVaultFilesForDeletion(plugin: GoogleCalendarTaskSync, googleEventId?: string): Promise<void> {
